@@ -247,11 +247,7 @@ public:
   // Пусть it ссылается на некоторый элемент e.
   // erase инвалидирует все итераторы ссылающиеся на e и на элемент парный к e.
   left_iterator erase_left(left_iterator it) {
-    auto result = left_set.erase(it.it);
-    right_set.erase(it.flip().it);
-    delete &get_node(it);
-    --m_size;
-    return create_iterator<left_iterator>(result);
+    return erase(it);
   }
 
   // Аналогично erase, но по ключу, удаляет элемент если он присутствует, иначе
@@ -266,11 +262,7 @@ public:
   }
 
   right_iterator erase_right(right_iterator it) {
-    auto result = right_set.erase(it.it);
-    left_set.erase(it.flip().it);
-    delete &get_node(it);
-    --m_size;
-    return create_iterator<right_iterator>(result);
+    return erase(it);
   }
 
   bool erase_right(right_t const& right) {
@@ -443,6 +435,14 @@ private:
     return insert_node(u);
   }
 
+  template <typename Iterator>
+  Iterator erase(Iterator it) {
+    auto result = std::next(it);
+    delete &get_node(it);
+    --m_size;
+    return result;
+  }
+
   left_iterator insert_node(Node* u) {
     auto left_it = left_set.insert(*u);
     if (&(*left_it) != u) {
@@ -451,7 +451,6 @@ private:
     }
     auto right_it = right_set.insert(*u);
     if (&(*right_it) != u) {
-      left_set.erase(left_it);
       delete u;
       return end_left();
     }

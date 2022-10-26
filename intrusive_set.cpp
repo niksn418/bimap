@@ -26,6 +26,7 @@ void set_base::unlink() {
     set_base* v = right->minimum();
     swap(*v);
     unlink();
+    return;
   }
   left = right = parent = nullptr;
 }
