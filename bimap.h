@@ -152,7 +152,7 @@ private:
     }
 
     friend bool operator==(const iterator& lhs, const iterator& rhs) {
-      return lhs.set == rhs.set && lhs.it == rhs.it;
+      return lhs.it == rhs.it;
     }
 
     friend bool operator!=(const iterator& lhs, const iterator& rhs) {
@@ -277,15 +277,15 @@ public:
   // erase от ренжа, удаляет [first, last), возвращает итератор на последний
   // элемент за удаленной последовательностью
   left_iterator erase_left(left_iterator first, left_iterator last) {
-    for (auto it = first; it != last;) {
-      it = erase_left(it);
+    while (first != last) {
+      first = erase_left(first);
     }
     return last;
   }
 
   right_iterator erase_right(right_iterator first, right_iterator last) {
-    for (auto it = first; it != last;) {
-      it = erase_right(it);
+    while (first != last) {
+      first = erase_right(first);
     }
     return last;
   }
