@@ -328,10 +328,7 @@ public:
     auto it = find_left(key);
     if (it == end_left()) {
       Node* u = new Node(left_tag(), key);
-      auto it1 = find_right(u->right);
-      if (it1 != end_right()) {
-        erase_right(it1);
-      }
+      erase_right(u->right);
       insert_node(u);
       return u->right;
     } else {
@@ -345,10 +342,7 @@ public:
     auto it = find_right(key);
     if (it == end_right()) {
       Node* u = new Node(right_tag(), key);
-      auto it1 = find_left(u->left);
-      if (it1 != end_left()) {
-        erase_left(it1);
-      }
+      erase_left(u->left);
       insert_node(u);
       return u->left;
     } else {
