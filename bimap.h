@@ -28,9 +28,7 @@ private:
 
     template <typename T, typename R>
     Node(T&& left, R&& right)
-        : intrusive_set::set_element<left_comp, left_extract>(),
-          intrusive_set::set_element<right_comp, right_extract>(),
-          left(std::forward<T>(left)), right(std::forward<R>(right)) {}
+        : left(std::forward<T>(left)), right(std::forward<R>(right)) {}
 
     template <bool t = std::is_default_constructible_v<right_t>,
               std::enable_if_t<t, int> = 0>
