@@ -13,16 +13,14 @@ struct bimap {
 private:
   size_t m_size = 0;
 
-  struct left_comp;
-  struct right_comp;
   struct left_extract;
   struct right_extract;
 
   struct left_tag {};
   struct right_tag {};
 
-  struct Node : intrusive_set::set_element<left_comp, left_extract>,
-                intrusive_set::set_element<right_comp, right_extract> {
+  struct Node : intrusive_set::set_element<CompareLeft, left_extract>,
+                intrusive_set::set_element<CompareRight, right_extract> {
     left_t left;
     right_t right;
 
@@ -37,22 +35,6 @@ private:
     template <bool t = std::is_default_constructible_v<left_t>,
               std::enable_if_t<t, int> = 0>
     Node(right_tag, right_t const& right) : left(), right(right) {}
-  };
-
-  struct left_comp : CompareLeft {
-    left_comp(CompareLeft&& comp) : CompareLeft(std::move(comp)) {}
-
-    bool operator()(left_t const& left, left_t const& right) const {
-      return CompareLeft::operator()(left, right);
-    }
-  };
-
-  struct right_comp : CompareRight {
-    right_comp(CompareRight&& comp) : CompareRight(std::move(comp)) {}
-
-    bool operator()(right_t const& left, right_t const& right) const {
-      return CompareRight::operator()(left, right);
-    }
   };
 
   struct left_extract {
@@ -71,8 +53,8 @@ private:
     }
   };
 
-  using left_set_t = intrusive_set::set<Node, left_comp, left_extract>;
-  using right_set_t = intrusive_set::set<Node, right_comp, right_extract>;
+  using left_set_t = intrusive_set::set<Node, CompareLeft, left_extract>;
+  using right_set_t = intrusive_set::set<Node, CompareRight, right_extract>;
 
   using left_set_iterator = typename left_set_t::const_iterator;
   using right_set_iterator = typename right_set_t::const_iterator;
