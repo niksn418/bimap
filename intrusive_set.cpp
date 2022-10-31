@@ -108,4 +108,8 @@ void set_base::swap_with_parent() {
   parent = parent->parent;
   fix_children();
 }
+
+bool set_base::is_root() const {
+  return parent == nullptr;
+}
 } // namespace intrusive_set

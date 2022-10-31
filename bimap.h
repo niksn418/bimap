@@ -82,9 +82,9 @@ private:
   using left_extract = bimap_details::left_extract<Left, Right>;
   using right_extract = bimap_details::right_extract<Left, Right>;
 
-  template <bool is_left>
-  struct iterator {
-    using value_type = std::conditional_t<is_left, const left_t, const right_t>;
+  template <typename Value, typename Extract, typename BaseIterator>
+  struct iterator : protected BaseIterator {
+    using value_type = const Value;
     using reference = value_type&;
     using pointer = value_type*;
     using iterator_category = std::bidirectional_iterator_tag;
@@ -94,11 +94,7 @@ private:
     // Разыменование итератора end_left() неопределено.
     // Разыменование невалидного итератора неопределено.
     reference operator*() const {
-      if constexpr (is_left) {
-        return (*it).left;
-      } else {
-        return (*it).right;
-      }
+      return Extract::get(get_node(*this));
     }
 
     pointer operator->() const {
@@ -109,7 +105,7 @@ private:
     // Инкремент итератора end_left() неопределен.
     // Инкремент невалидного итератора неопределен.
     iterator& operator++() {
-      ++it;
+      iterator_base::operator++();
       return *this;
     }
 
@@ -123,7 +119,7 @@ private:
     // Декремент итератора begin_left() неопределен.
     // Декремент невалидного итератора неопределен.
     iterator& operator--() {
-      --it;
+      iterator_base::operator--();
       return *this;
     }
 
@@ -138,21 +134,13 @@ private:
     // end_left().flip() возращает end_right().
     // end_right().flip() возвращает end_left().
     // flip() невалидного итератора неопределен.
-    iterator<!is_left> flip() const {
-      if constexpr (is_left) {
-        if (*this == set->end_left()) {
-          return set->end_right();
-        }
-      } else {
-        if (*this == set->end_right()) {
-          return set->end_left();
-        }
-      }
-      return {{const_cast<node_t&>(*it)}, set};
+    auto flip() const {
+      return flip_iterator(*this);
     }
 
     friend bool operator==(const iterator& lhs, const iterator& rhs) {
-      return lhs.it == rhs.it;
+      return static_cast<const iterator_base&>(lhs) ==
+             static_cast<const iterator_base&>(rhs);
     }
 
     friend bool operator!=(const iterator& lhs, const iterator& rhs) {
@@ -160,29 +148,27 @@ private:
     }
 
   private:
-    using iterator_base =
-        std::conditional_t<is_left, left_set_iterator, right_set_iterator>;
-    iterator_base it;
-    bimap const* set;
+    using iterator_base = BaseIterator;
 
     friend bimap;
 
-    iterator(iterator_base it, bimap const* set) : it(it), set(set) {}
+    iterator(iterator_base it) : iterator_base(it) {}
+
+    auto get_pointer() {
+      return iterator_base::get_pointer();
+    }
+
+    iterator(intrusive_set::set_element<Extract>* ptr) : iterator_base({ptr}) {}
   };
 
   template <typename Iterator>
-  Iterator create_iterator(typename Iterator::iterator_base it) const {
-    return {it, this};
-  }
-
-  template <typename Iterator>
   static node_t const& get_node(Iterator it) {
-    return *it.it;
+    return it.iterator_base::operator*();
   }
 
 public:
-  using left_iterator = iterator<true>;
-  using right_iterator = iterator<false>;
+  using left_iterator = iterator<left_t, left_extract, left_set_iterator>;
+  using right_iterator = iterator<right_t, right_extract, right_set_iterator>;
 
   // Создает bimap не содержащий ни одной пары.
   bimap(CompareLeft compare_left = CompareLeft(),
@@ -290,11 +276,11 @@ public:
 
   // Возвращает итератор по элементу. Если не найден - соответствующий end()
   left_iterator find_left(left_t const& left) const {
-    return create_iterator<left_iterator>(left_set::find(left));
+    return {left_set::find(left)};
   }
 
   right_iterator find_right(right_t const& right) const {
-    return create_iterator<right_iterator>(right_set::find(right));
+    return {right_set::find(right)};
   }
 
   // Возвращает противоположный элемент по элементу
@@ -352,37 +338,37 @@ public:
   // Возвращают итераторы на соответствующие элементы
   // Смотри std::lower_bound, std::upper_bound.
   left_iterator lower_bound_left(left_t const& left) const {
-    return create_iterator<left_iterator>(left_set::lower_bound(left));
+    return {left_set::lower_bound(left)};
   }
 
   left_iterator upper_bound_left(left_t const& left) const {
-    return create_iterator<left_iterator>(left_set::upper_bound(left));
+    return {left_set::upper_bound(left)};
   }
 
   right_iterator lower_bound_right(right_t const& right) const {
-    return create_iterator<right_iterator>(right_set::lower_bound(right));
+    return {right_set::lower_bound(right)};
   }
 
   right_iterator upper_bound_right(right_t const& right) const {
-    return create_iterator<right_iterator>(right_set::upper_bound(right));
+    return {right_set::upper_bound(right)};
   }
 
   // Возващает итератор на минимальный по порядку left.
   left_iterator begin_left() const {
-    return create_iterator<left_iterator>(left_set::begin());
+    return {left_set::begin()};
   }
   // Возващает итератор на следующий за последним по порядку left.
   left_iterator end_left() const {
-    return create_iterator<left_iterator>(left_set::end());
+    return {left_set::end()};
   }
 
   // Возващает итератор на минимальный по порядку right.
   right_iterator begin_right() const {
-    return create_iterator<right_iterator>(right_set::begin());
+    return {right_set::begin()};
   }
   // Возващает итератор на следующий за последним по порядку right.
   right_iterator end_right() const {
-    return create_iterator<right_iterator>(right_set::end());
+    return {right_set::end()};
   }
 
   // Проверка на пустоту
@@ -448,6 +434,24 @@ private:
       return end_left();
     }
     ++m_size;
-    return create_iterator<left_iterator>(left_it);
+    return {left_it};
+  }
+
+  static right_iterator flip_iterator(left_iterator it) {
+    auto* ptr = it.get_pointer();
+    if (ptr->is_root()) {
+      return {static_cast<right_set*>(
+          static_cast<bimap*>(static_cast<left_set*>(ptr)))};
+    }
+    return {static_cast<node_t*>(it.get_pointer())};
+  }
+
+  static left_iterator flip_iterator(right_iterator it) {
+    auto* ptr = it.get_pointer();
+    if (ptr->is_root()) {
+      return {static_cast<left_set*>(
+          static_cast<bimap*>(static_cast<right_set*>(ptr)))};
+    }
+    return {static_cast<node_t*>(it.get_pointer())};
   }
 };

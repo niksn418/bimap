@@ -22,6 +22,8 @@ struct set_base {
 
   set_base* maximum();
 
+  bool is_root() const;
+
 private:
   set_base* left;
   set_base* right;
@@ -188,7 +190,12 @@ private:
 
     friend set;
 
+  protected:
     iterator_base(set_base* value) : value(value) {}
+
+    set_element<KeyExtract>* get_pointer() {
+      return static_cast<set_element<KeyExtract>*>(value);
+    }
   };
 
 public:
