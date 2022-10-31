@@ -47,7 +47,7 @@ struct set_element : public set_base {
 };
 
 template <typename T, typename Comp, typename KeyExtract>
-struct set : private Comp, private KeyExtract {
+struct set : private Comp {
   set(Comp comp = Comp())
       : Comp(std::move(comp)), sentinel(nullptr, nullptr, nullptr) {}
 
@@ -86,8 +86,8 @@ private:
     return Comp::operator()(left, right);
   }
 
-  key_t const& get_key(T const& value) const {
-    return KeyExtract::operator()(value);
+  static key_t const& get_key(T const& value) {
+    return KeyExtract::get(value);
   }
 
   static T& get_value(set_base* element) {

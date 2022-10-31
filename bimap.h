@@ -40,7 +40,7 @@ private:
   struct left_extract {
     using type = left_t;
 
-    const type& operator()(const Node& value) const {
+    static const type& get(const Node& value) {
       return value.left;
     }
   };
@@ -48,7 +48,7 @@ private:
   struct right_extract {
     using type = right_t;
 
-    const type& operator()(const Node& value) const {
+    static const type& get(const Node& value) {
       return value.right;
     }
   };
