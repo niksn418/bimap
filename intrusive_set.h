@@ -41,7 +41,7 @@ private:
   friend struct set;
 };
 
-template <typename Comp, typename KeyExtract>
+template <typename KeyExtract>
 struct set_element : public set_base {
   using set_base::set_base;
 };
@@ -80,7 +80,7 @@ struct set : private Comp {
 private:
   using key_t = typename KeyExtract::type;
 
-  set_element<Comp, KeyExtract> sentinel;
+  set_element<KeyExtract> sentinel;
 
   bool compare(key_t const& left, key_t const& right) const {
     return Comp::operator()(left, right);
@@ -92,12 +92,12 @@ private:
 
   static T& get_value(set_base* element) {
     return *static_cast<T*>(
-        static_cast<set_element<Comp, KeyExtract>*>(element));
+        static_cast<set_element<KeyExtract>*>(element));
   }
 
   static set_base* get_base(T& element) {
     return &static_cast<set_base&>(
-        static_cast<set_element<Comp, KeyExtract>&>(element));
+        static_cast<set_element<KeyExtract>&>(element));
   }
 
   set_base* const& root() const {
@@ -202,7 +202,7 @@ public:
   }
 
   const_iterator end() const {
-    return {const_cast<set_element<Comp, KeyExtract>*>(&sentinel)};
+    return {const_cast<set_element<KeyExtract>*>(&sentinel)};
   }
 
   iterator insert(T& element) {

@@ -19,8 +19,8 @@ private:
   struct left_tag {};
   struct right_tag {};
 
-  struct Node : intrusive_set::set_element<CompareLeft, left_extract>,
-                intrusive_set::set_element<CompareRight, right_extract> {
+  struct Node : intrusive_set::set_element<left_extract>,
+                intrusive_set::set_element<right_extract> {
     left_t left;
     right_t right;
 
