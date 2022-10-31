@@ -47,9 +47,10 @@ struct set_element : public set_base {
 };
 
 template <typename T, typename Comp, typename KeyExtract>
-struct set : private Comp {
+struct set : protected set_element<KeyExtract>, private Comp {
   set(Comp comp = Comp())
-      : Comp(std::move(comp)), sentinel(nullptr, nullptr, nullptr) {}
+      : set_element<KeyExtract>(nullptr, nullptr, nullptr),
+        Comp(std::move(comp)) {}
 
   set(set&& other) = default;
 
@@ -69,7 +70,7 @@ struct set : private Comp {
   }
 
   void swap(set& other) {
-    sentinel.swap(other.sentinel);
+    sentinel()->swap(other);
   }
 
   bool equal(T const& left, T const& right) const {
@@ -80,7 +81,13 @@ struct set : private Comp {
 private:
   using key_t = typename KeyExtract::type;
 
-  set_element<KeyExtract> sentinel;
+  set_element<KeyExtract>* sentinel() {
+    return this;
+  }
+
+  set_element<KeyExtract> const* sentinel() const {
+    return this;
+  }
 
   bool compare(key_t const& left, key_t const& right) const {
     return Comp::operator()(left, right);
@@ -91,8 +98,7 @@ private:
   }
 
   static T& get_value(set_base* element) {
-    return *static_cast<T*>(
-        static_cast<set_element<KeyExtract>*>(element));
+    return *static_cast<T*>(static_cast<set_element<KeyExtract>*>(element));
   }
 
   static set_base* get_base(T& element) {
@@ -101,11 +107,11 @@ private:
   }
 
   set_base* const& root() const {
-    return sentinel.left;
+    return sentinel()->left;
   }
 
   set_base*& root() {
-    return sentinel.left;
+    return sentinel()->left;
   }
 
   template <bool is_const>
@@ -198,16 +204,16 @@ public:
   }
 
   iterator end() {
-    return {&sentinel};
+    return {sentinel()};
   }
 
   const_iterator end() const {
-    return {const_cast<set_element<KeyExtract>*>(&sentinel)};
+    return {const_cast<set_element<KeyExtract>*>(sentinel())};
   }
 
   iterator insert(T& element) {
     set_base** cur = &root();
-    set_base* parent = &sentinel;
+    set_base* parent = sentinel();
     key_t const& key = get_key(element);
     while (*cur != nullptr) {
       parent = *cur;
