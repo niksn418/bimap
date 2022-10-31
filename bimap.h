@@ -94,7 +94,7 @@ private:
     // Разыменование итератора end_left() неопределено.
     // Разыменование невалидного итератора неопределено.
     reference operator*() const {
-      return Extract::get(get_node(*this));
+      return Extract::get(get_node());
     }
 
     pointer operator->() const {
@@ -105,7 +105,7 @@ private:
     // Инкремент итератора end_left() неопределен.
     // Инкремент невалидного итератора неопределен.
     iterator& operator++() {
-      iterator_base::operator++();
+      BaseIterator::operator++();
       return *this;
     }
 
@@ -119,7 +119,7 @@ private:
     // Декремент итератора begin_left() неопределен.
     // Декремент невалидного итератора неопределен.
     iterator& operator--() {
-      iterator_base::operator--();
+      BaseIterator::operator--();
       return *this;
     }
 
@@ -139,8 +139,8 @@ private:
     }
 
     friend bool operator==(const iterator& lhs, const iterator& rhs) {
-      return static_cast<const iterator_base&>(lhs) ==
-             static_cast<const iterator_base&>(rhs);
+      return static_cast<const BaseIterator&>(lhs) ==
+             static_cast<const BaseIterator&>(rhs);
     }
 
     friend bool operator!=(const iterator& lhs, const iterator& rhs) {
@@ -148,22 +148,24 @@ private:
     }
 
   private:
-    using iterator_base = BaseIterator;
-
     friend bimap;
 
-    iterator(iterator_base it) : iterator_base(it) {}
+    iterator(BaseIterator it) : BaseIterator(it) {}
 
     auto get_pointer() {
-      return iterator_base::get_pointer();
+      return BaseIterator::get_pointer();
     }
 
-    iterator(intrusive_set::set_element<Extract>* ptr) : iterator_base({ptr}) {}
+    node_t const& get_node() const {
+      return BaseIterator::operator*();
+    }
+
+    iterator(intrusive_set::set_element<Extract>* ptr) : BaseIterator(ptr) {}
   };
 
   template <typename Iterator>
   static node_t const& get_node(Iterator it) {
-    return it.iterator_base::operator*();
+    return it.get_node();
   }
 
 public:
