@@ -9,63 +9,78 @@ inline constexpr struct left_tag_t {
 } left_tag{};
 inline constexpr struct right_tag_t {
 } right_tag{};
+
+template <typename Left, typename Right>
+struct left_extract;
+
+template <typename Left, typename Right>
+struct right_extract;
+
+template <typename Left, typename Right>
+struct Node : intrusive_set::set_element<left_extract<Left, Right>>,
+              intrusive_set::set_element<right_extract<Left, Right>> {
+  Left left;
+  Right right;
+
+  template <typename T, typename R>
+  Node(T&& left, R&& right)
+      : left(std::forward<T>(left)), right(std::forward<R>(right)) {}
+
+  template <bool t = std::is_default_constructible_v<Right>,
+            std::enable_if_t<t, int> = 0>
+  Node(left_tag_t, Left const& left) : left(left), right() {}
+
+  template <bool t = std::is_default_constructible_v<Left>,
+            std::enable_if_t<t, int> = 0>
+  Node(right_tag_t, Right const& right) : left(), right(right) {}
+};
+
+template <typename Left, typename Right>
+struct left_extract {
+  using type = Left;
+
+  static const type& get(const Node<Left, Right>& value) {
+    return value.left;
+  }
+};
+
+template <typename Left, typename Right>
+struct right_extract {
+  using type = Right;
+
+  static const type& get(const Node<Left, Right>& value) {
+    return value.right;
+  }
+};
+
+template <typename Left, typename Right, typename Comp>
+using left_set =
+    intrusive_set::set<Node<Left, Right>, Comp, left_extract<Left, Right>>;
+
+template <typename Left, typename Right, typename Comp>
+using right_set =
+    intrusive_set::set<Node<Left, Right>, Comp, right_extract<Left, Right>>;
 } // namespace bimap_details
 
 template <typename Left, typename Right, typename CompareLeft = std::less<Left>,
           typename CompareRight = std::less<Right>>
-struct bimap {
+struct bimap : private bimap_details::left_set<Left, Right, CompareLeft>,
+               private bimap_details::right_set<Left, Right, CompareRight> {
   using left_t = Left;
   using right_t = Right;
+  using node_t = bimap_details::Node<Left, Right>;
 
 private:
   size_t m_size = 0;
 
-  struct left_extract;
-  struct right_extract;
+  using left_set = bimap_details::left_set<Left, Right, CompareLeft>;
+  using right_set = bimap_details::right_set<Left, Right, CompareRight>;
 
-  struct Node : intrusive_set::set_element<left_extract>,
-                intrusive_set::set_element<right_extract> {
-    left_t left;
-    right_t right;
+  using left_set_iterator = typename left_set::const_iterator;
+  using right_set_iterator = typename right_set::const_iterator;
 
-    template <typename T, typename R>
-    Node(T&& left, R&& right)
-        : left(std::forward<T>(left)), right(std::forward<R>(right)) {}
-
-    template <bool t = std::is_default_constructible_v<right_t>,
-              std::enable_if_t<t, int> = 0>
-    Node(bimap_details::left_tag_t, left_t const& left) : left(left), right() {}
-
-    template <bool t = std::is_default_constructible_v<left_t>,
-              std::enable_if_t<t, int> = 0>
-    Node(bimap_details::right_tag_t, right_t const& right)
-        : left(), right(right) {}
-  };
-
-  struct left_extract {
-    using type = left_t;
-
-    static const type& get(const Node& value) {
-      return value.left;
-    }
-  };
-
-  struct right_extract {
-    using type = right_t;
-
-    static const type& get(const Node& value) {
-      return value.right;
-    }
-  };
-
-  using left_set_t = intrusive_set::set<Node, CompareLeft, left_extract>;
-  using right_set_t = intrusive_set::set<Node, CompareRight, right_extract>;
-
-  using left_set_iterator = typename left_set_t::const_iterator;
-  using right_set_iterator = typename right_set_t::const_iterator;
-
-  left_set_t left_set;
-  right_set_t right_set;
+  using left_extract = bimap_details::left_extract<Left, Right>;
+  using right_extract = bimap_details::right_extract<Left, Right>;
 
   template <bool is_left>
   struct iterator {
@@ -133,7 +148,7 @@ private:
           return set->end_left();
         }
       }
-      return {{const_cast<Node&>(*it)}, set};
+      return {{const_cast<node_t&>(*it)}, set};
     }
 
     friend bool operator==(const iterator& lhs, const iterator& rhs) {
@@ -161,13 +176,11 @@ private:
   }
 
   template <typename Iterator>
-  static Node const& get_node(Iterator it) {
+  static node_t const& get_node(Iterator it) {
     return *it.it;
   }
 
 public:
-  using node_t = Node;
-
   using left_iterator = iterator<true>;
   using right_iterator = iterator<false>;
 
@@ -277,11 +290,11 @@ public:
 
   // Возвращает итератор по элементу. Если не найден - соответствующий end()
   left_iterator find_left(left_t const& left) const {
-    return create_iterator<left_iterator>(left_set.find(left));
+    return create_iterator<left_iterator>(left_set::find(left));
   }
 
   right_iterator find_right(right_t const& right) const {
-    return create_iterator<right_iterator>(right_set.find(right));
+    return create_iterator<right_iterator>(right_set::find(right));
   }
 
   // Возвращает противоположный элемент по элементу
@@ -312,7 +325,7 @@ public:
   right_t const& at_left_or_default(left_t const& key) {
     auto it = find_left(key);
     if (it == end_left()) {
-      Node* u = new Node(bimap_details::left_tag, key);
+      auto* u = new node_t(bimap_details::left_tag, key);
       erase_right(u->right);
       insert_node(u);
       return u->right;
@@ -326,7 +339,7 @@ public:
   left_t const& at_right_or_default(right_t const& key) {
     auto it = find_right(key);
     if (it == end_right()) {
-      Node* u = new Node(bimap_details::right_tag, key);
+      auto* u = new node_t(bimap_details::right_tag, key);
       erase_left(u->left);
       insert_node(u);
       return u->left;
@@ -339,37 +352,37 @@ public:
   // Возвращают итераторы на соответствующие элементы
   // Смотри std::lower_bound, std::upper_bound.
   left_iterator lower_bound_left(left_t const& left) const {
-    return create_iterator<left_iterator>(left_set.lower_bound(left));
+    return create_iterator<left_iterator>(left_set::lower_bound(left));
   }
 
   left_iterator upper_bound_left(left_t const& left) const {
-    return create_iterator<left_iterator>(left_set.upper_bound(left));
+    return create_iterator<left_iterator>(left_set::upper_bound(left));
   }
 
   right_iterator lower_bound_right(right_t const& right) const {
-    return create_iterator<right_iterator>(right_set.lower_bound(right));
+    return create_iterator<right_iterator>(right_set::lower_bound(right));
   }
 
   right_iterator upper_bound_right(right_t const& right) const {
-    return create_iterator<right_iterator>(right_set.upper_bound(right));
+    return create_iterator<right_iterator>(right_set::upper_bound(right));
   }
 
   // Возващает итератор на минимальный по порядку left.
   left_iterator begin_left() const {
-    return create_iterator<left_iterator>(left_set.begin());
+    return create_iterator<left_iterator>(left_set::begin());
   }
   // Возващает итератор на следующий за последним по порядку left.
   left_iterator end_left() const {
-    return create_iterator<left_iterator>(left_set.end());
+    return create_iterator<left_iterator>(left_set::end());
   }
 
   // Возващает итератор на минимальный по порядку right.
   right_iterator begin_right() const {
-    return create_iterator<right_iterator>(right_set.begin());
+    return create_iterator<right_iterator>(right_set::begin());
   }
   // Возващает итератор на следующий за последним по порядку right.
   right_iterator end_right() const {
-    return create_iterator<right_iterator>(right_set.end());
+    return create_iterator<right_iterator>(right_set::end());
   }
 
   // Проверка на пустоту
@@ -388,9 +401,10 @@ public:
     }
     for (auto it1 = a.begin_left(), it2 = b.begin_left();
          it1 != a.end_left(), it2 != b.end_left(); ++it1, ++it2) {
-      Node const& node1 = get_node(it1);
-      Node const& node2 = get_node(it2);
-      if (!a.left_set.equal(node1, node2) || !a.right_set.equal(node1, node2)) {
+      node_t const& node1 = get_node(it1);
+      node_t const& node2 = get_node(it2);
+      if (!a.left_set::equal(node1, node2) ||
+          !a.right_set::equal(node1, node2)) {
         return false;
       }
     }
@@ -403,14 +417,14 @@ public:
 
   void swap(bimap& other) noexcept {
     std::swap(m_size, other.m_size);
-    left_set.swap(other.left_set);
-    right_set.swap(other.right_set);
+    left_set::swap(other);
+    right_set::swap(other);
   }
 
 private:
   template <typename T, typename R>
   left_iterator generic_insert(T&& left, R&& right) {
-    Node* u = new Node(std::forward<T>(left), std::forward<R>(right));
+    auto* u = new node_t(std::forward<T>(left), std::forward<R>(right));
     return insert_node(u);
   }
 
@@ -422,13 +436,13 @@ private:
     return result;
   }
 
-  left_iterator insert_node(Node* u) {
-    auto left_it = left_set.insert(*u);
+  left_iterator insert_node(node_t* u) {
+    auto left_it = left_set::insert(*u);
     if (&(*left_it) != u) {
       delete u;
       return end_left();
     }
-    auto right_it = right_set.insert(*u);
+    auto right_it = right_set::insert(*u);
     if (&(*right_it) != u) {
       delete u;
       return end_left();
