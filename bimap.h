@@ -4,6 +4,13 @@
 
 #include "intrusive_set.h"
 
+namespace bimap_details {
+inline constexpr struct left_tag_t {
+} left_tag{};
+inline constexpr struct right_tag_t {
+} right_tag{};
+} // namespace bimap_details
+
 template <typename Left, typename Right, typename CompareLeft = std::less<Left>,
           typename CompareRight = std::less<Right>>
 struct bimap {
@@ -16,9 +23,6 @@ private:
   struct left_extract;
   struct right_extract;
 
-  struct left_tag {};
-  struct right_tag {};
-
   struct Node : intrusive_set::set_element<left_extract>,
                 intrusive_set::set_element<right_extract> {
     left_t left;
@@ -30,11 +34,12 @@ private:
 
     template <bool t = std::is_default_constructible_v<right_t>,
               std::enable_if_t<t, int> = 0>
-    Node(left_tag, left_t const& left) : left(left), right() {}
+    Node(bimap_details::left_tag_t, left_t const& left) : left(left), right() {}
 
     template <bool t = std::is_default_constructible_v<left_t>,
               std::enable_if_t<t, int> = 0>
-    Node(right_tag, right_t const& right) : left(), right(right) {}
+    Node(bimap_details::right_tag_t, right_t const& right)
+        : left(), right(right) {}
   };
 
   struct left_extract {
@@ -307,7 +312,7 @@ public:
   right_t const& at_left_or_default(left_t const& key) {
     auto it = find_left(key);
     if (it == end_left()) {
-      Node* u = new Node(left_tag(), key);
+      Node* u = new Node(bimap_details::left_tag, key);
       erase_right(u->right);
       insert_node(u);
       return u->right;
@@ -321,7 +326,7 @@ public:
   left_t const& at_right_or_default(right_t const& key) {
     auto it = find_right(key);
     if (it == end_right()) {
-      Node* u = new Node(right_tag(), key);
+      Node* u = new Node(bimap_details::right_tag, key);
       erase_left(u->left);
       insert_node(u);
       return u->left;
